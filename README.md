@@ -23,6 +23,7 @@ Features
 
 * Written entirely in Python.
 * Parse, analyze, and convert PDF documents.
+* Extract content as text, images, html or [hOCR](https://en.wikipedia.org/wiki/HOCR).
 * PDF-1.7 specification support. (well, almost).
 * CJK languages and vertical writing scripts support.
 * Various font types (Type1, TrueType, Type3, and CID) support.
@@ -38,18 +39,28 @@ Features
 How to use
 ----------
 
-* Install Python 3.6 or newer.
-* Install
-
-  `pip install pdfminer.six`
+* Install Python 3.8 or newer.
+* Install pdfminer.six.
+  ```bash
+  pip install pdfminer.six
 
 * (Optionally) install extra dependencies for extracting images.
 
-  `pip install 'pdfminer.six[image]`
+  ```bash
+  pip install 'pdfminer.six[image]'
 
-* Use command-line interface to extract text from pdf:
+* Use the command-line interface to extract text from pdf.
 
-  `python pdf2txt.py samples/simple1.pdf`
+  ```bash
+  pdf2txt.py example.pdf
+
+* Or use it with Python. 
+  ```python
+  from pdfminer.high_level import extract_text
+
+  text = extract_text("example.pdf")
+  print(text)
+  ```
 
 Contributing
 ------------

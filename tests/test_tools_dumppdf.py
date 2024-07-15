@@ -2,8 +2,8 @@ import unittest
 
 import pytest
 
-from helpers import absolute_sample_path
-from tempfilepath import TemporaryFilePath
+from tests.helpers import absolute_sample_path
+from tests.tempfilepath import TemporaryFilePath
 from tools import dumppdf
 
 
@@ -11,9 +11,9 @@ def run(filename, options=None):
     absolute_path = absolute_sample_path(filename)
     with TemporaryFilePath() as output_file_name:
         if options:
-            s = "dumppdf -o %s %s %s" % (output_file_name, options, absolute_path)
+            s = f"dumppdf -o {output_file_name} {options} {absolute_path}"
         else:
-            s = "dumppdf -o %s %s" % (output_file_name, absolute_path)
+            s = f"dumppdf -o {output_file_name} {absolute_path}"
 
         dumppdf.main(s.split(" ")[1:])
 

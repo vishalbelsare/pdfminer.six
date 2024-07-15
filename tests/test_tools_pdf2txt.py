@@ -1,20 +1,20 @@
+import filecmp
 import os
 from shutil import rmtree
 from tempfile import mkdtemp
-import filecmp
 
-import tools.pdf2txt as pdf2txt
-from helpers import absolute_sample_path
-from tempfilepath import TemporaryFilePath
+from tests.helpers import absolute_sample_path
+from tests.tempfilepath import TemporaryFilePath
+from tools import pdf2txt
 
 
 def run(sample_path, options=None):
     absolute_path = absolute_sample_path(sample_path)
     with TemporaryFilePath() as output_file_name:
         if options:
-            s = "pdf2txt -o{} {} {}".format(output_file_name, options, absolute_path)
+            s = f"pdf2txt -o{output_file_name} {options} {absolute_path}"
         else:
-            s = "pdf2txt -o{} {}".format(output_file_name, absolute_path)
+            s = f"pdf2txt -o{output_file_name} {absolute_path}"
 
         pdf2txt.main(s.split(" ")[1:])
 
@@ -64,7 +64,8 @@ class TestPdf2Txt:
 
     def test_contrib_issue_350(self):
         """Regression test for
-        https://github.com/pdfminer/pdfminer.six/issues/350"""
+        https://github.com/pdfminer/pdfminer.six/issues/350
+        """
         run("contrib/issue-00352-asw-oct96-p41.pdf")
 
     def test_scancode_patchelf(self):
@@ -110,6 +111,12 @@ class TestPdf2Txt:
 
     def test_encryption_rc4_128(self):
         run("encryption/rc4-128.pdf", "-P foo")
+
+    def test_html_simple1(self):
+        run("simple1.pdf", "-t html")
+
+    def test_hocr_simple1(self):
+        run("simple1.pdf", "-t hocr")
 
 
 class TestDumpImages:
@@ -171,3 +178,16 @@ class TestDumpImages:
     def test_nonfree_cmp_itext_logo(self):
         """Test a pdf with Type3 font"""
         run("nonfree/cmp_itext_logo.pdf")
+
+    def test_contrib_issue_495_pdfobjref(self):
+        """Test for extracting a zipped pdf"""
+        filepath = absolute_sample_path("contrib/issue_495_pdfobjref.pdf")
+        image_files = self.extract_images(filepath)
+        assert image_files[0].endswith("jpg")
+
+    def test_contrib_issue_1008_inline(self):
+        """Test for parsing and extracting inline images"""
+        filepath = absolute_sample_path("contrib/issue-1008-inline-ascii85.pdf")
+        image_files = self.extract_images(filepath)
+        assert len(image_files) == 23
+        assert all(x.endswith(".bmp") for x in image_files)

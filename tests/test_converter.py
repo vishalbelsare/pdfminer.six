@@ -1,10 +1,11 @@
 import io
 from tempfile import TemporaryFile
 
-from pdfminer.converter import PDFLayoutAnalyzer, PDFConverter
+from pdfminer.converter import PDFConverter, PDFLayoutAnalyzer
 from pdfminer.high_level import extract_pages
-from pdfminer.layout import LTContainer, LTRect, LTLine, LTCurve
+from pdfminer.layout import LTChar, LTContainer, LTCurve, LTLine, LTRect
 from pdfminer.pdfinterp import PDFGraphicState
+from tests.helpers import absolute_sample_path
 
 
 class TestPaintPath:
@@ -47,7 +48,7 @@ class TestPaintPath:
         assert len(analyzer.cur_item._objs) == 3
 
     def test_paint_path_quadrilaterals(self):
-        """via https://github.com/pdfminer/pdfminer.six/issues/473"""
+        """Via https://github.com/pdfminer/pdfminer.six/issues/473"""
 
         def parse(path):
             analyzer = self._get_analyzer()
@@ -66,7 +67,7 @@ class TestPaintPath:
                 ("l", 90, 10),
                 ("l", 10, 10),
                 ("h",),
-            ]
+            ],
         ) == [LTRect]
 
         # Same but mllll variation
@@ -77,7 +78,7 @@ class TestPaintPath:
                 ("l", 90, 10),
                 ("l", 10, 10),
                 ("l", 10, 90),
-            ]
+            ],
         ) == [LTRect]
 
         # Bowtie shape
@@ -88,7 +89,7 @@ class TestPaintPath:
                 ("l", 190, 90),
                 ("l", 110, 10),
                 ("h",),
-            ]
+            ],
         ) == [LTCurve]
 
         # Quadrilateral with one slanted side
@@ -99,7 +100,7 @@ class TestPaintPath:
                 ("l", 290, 10),
                 ("l", 210, 10),
                 ("h",),
-            ]
+            ],
         ) == [LTCurve]
 
         # Path with two rect subpaths
@@ -115,7 +116,7 @@ class TestPaintPath:
                 ("l", 390, 10),
                 ("l", 350, 10),
                 ("h",),
-            ]
+            ],
         ) == [LTRect, LTRect]
 
         # Path with one rect subpath and one pentagon
@@ -132,7 +133,7 @@ class TestPaintPath:
                 ("l", 490, 10),
                 ("l", 455, 10),
                 ("h",),
-            ]
+            ],
         ) == [LTRect, LTCurve]
 
         # Three types of simple lines
@@ -150,7 +151,7 @@ class TestPaintPath:
                 ("m", 10, 10),
                 ("l", 30, 30),
                 ("h",),
-            ]
+            ],
         ) == [LTLine, LTLine, LTLine]
 
         # Same as above, but 'ml' variation
@@ -165,14 +166,14 @@ class TestPaintPath:
                 # Diagonal line
                 ("m", 10, 10),
                 ("l", 30, 30),
-            ]
+            ],
         ) == [LTLine, LTLine, LTLine]
 
         # There are six lines in this one-page PDF;
         # they all have shape 'ml' not 'mlh'
         ml_pdf = extract_pages("samples/contrib/pr-00530-ml-lines.pdf")
         ml_pdf_page = list(ml_pdf)[0]
-        assert sum(type(item) == LTLine for item in ml_pdf_page) == 6
+        assert sum(type(item) is LTLine for item in ml_pdf_page) == 6
 
     def _get_analyzer(self):
         analyzer = PDFLayoutAnalyzer(None)
@@ -193,7 +194,7 @@ class TestPaintPath:
             [
                 ("m", 72.41, 433.89),
                 ("c", 72.41, 434.45, 71.96, 434.89, 71.41, 434.89),
-            ]
+            ],
         )[0].pts == [
             (72.41, 433.89),
             (71.41, 434.89),
@@ -215,6 +216,45 @@ class TestPaintPath:
             (71.41, 434.89),
         ]
 
+    def test_paint_path_beziers_check_raw(self):
+        """See section 4.4, table 4.9 of the PDF reference manual"""
+
+        def parse(path):
+            analyzer = self._get_analyzer()
+            analyzer.cur_item = LTContainer([0, 1000, 0, 1000])
+            analyzer.paint_path(PDFGraphicState(), False, False, False, path)
+            return analyzer.cur_item._objs
+
+        # "c" operator
+        assert parse(
+            [
+                ("m", 72.41, 433.89),
+                ("c", 72.41, 434.45, 71.96, 434.89, 71.41, 434.89),
+            ],
+        )[0].original_path == [
+            ("m", (72.41, 433.89)),
+            ("c", (72.41, 434.45), (71.96, 434.89), (71.41, 434.89)),
+        ]
+
+    def test_paint_path_dashed(self):
+        """See section 4.4, table 4.9 of the PDF reference manual"""
+
+        def parse(path):
+            analyzer = self._get_analyzer()
+            analyzer.cur_item = LTContainer([0, 1000, 0, 1000])
+            graphicstate = PDFGraphicState()
+            graphicstate.dash = ([1, 1], 0)
+            analyzer.paint_path(graphicstate, False, False, False, path)
+            return analyzer.cur_item._objs
+
+        # "c" operator
+        assert parse(
+            [
+                ("m", 72.41, 433.89),
+                ("c", 72.41, 434.45, 71.96, 434.89, 71.41, 434.89),
+            ],
+        )[0].dashing_style == ([1, 1], 0)
+
     def test_paint_path_without_starting_m(self):
         gs = PDFGraphicState()
         analyzer = self._get_analyzer()
@@ -223,6 +263,31 @@ class TestPaintPath:
         for path in paths:
             analyzer.paint_path(gs, False, False, False, path)
         assert len(analyzer.cur_item._objs) == 0
+
+
+def get_chars(el):
+    if isinstance(el, LTContainer):
+        for item in el:
+            yield from get_chars(item)
+    elif isinstance(el, LTChar):
+        yield el
+    else:
+        pass
+
+
+class TestColorSpace:
+    def test_do_rg(self):
+        path = absolute_sample_path("contrib/issue-00352-hash-twos-complement.pdf")
+        for page in extract_pages(path):
+            for char in get_chars(page):
+                cs = char.ncs.name
+                color = char.graphicstate.ncolor
+                if cs == "DeviceGray":
+                    assert isinstance(color, (float, int))
+                elif cs == "DeviceRGB":
+                    assert len(color) == 3
+                elif cs == "DeviceCMYK":
+                    assert len(color) == 4
 
 
 class TestBinaryDetector:

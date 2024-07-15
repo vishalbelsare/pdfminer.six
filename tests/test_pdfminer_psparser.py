@@ -1,6 +1,8 @@
 import logging
+from io import BytesIO
 
-from pdfminer.psparser import KWD, LIT, PSBaseParser, PSStackParser, PSEOF
+from pdfminer.psexceptions import PSEOF
+from pdfminer.psparser import KWD, LIT, PSBaseParser, PSStackParser
 
 logger = logging.getLogger(__name__)
 
@@ -141,10 +143,17 @@ func/a/b{(c)do*}def
         tokens = self.get_tokens(self.TESTDATA)
         logger.info(tokens)
         assert tokens == self.TOKENS
-        return
 
     def test_2(self):
         objs = self.get_objects(self.TESTDATA)
         logger.info(objs)
         assert objs == self.OBJS
-        return
+
+    def test_3(self):
+        """Regression test for streams that end with a keyword.
+
+        See: https://github.com/pdfminer/pdfminer.six/issues/884
+        """
+        parser = PSBaseParser(BytesIO(b"Do"))
+        parser._parse_keyword(b"Do", 0)
+        assert parser._tokens == [(0, KWD(b"Do"))]
